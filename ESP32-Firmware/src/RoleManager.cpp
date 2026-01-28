@@ -7,7 +7,7 @@ RoleManager::RoleManager(Heartbeat& hb, RelayControl& relays, char myId) : _hb(h
 void RoleManager::begin(){
     //Deterministic Startup:
     // A starts active, B starts standby
-    if(_myId = 'A'){
+    if(_myId == 'A'){
         becomeActive();
     } else {
         becomeStandby();
