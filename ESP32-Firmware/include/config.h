@@ -5,24 +5,24 @@
 // BUILD TIME CONFIG
 // ==============
 
-#ifdef DEVICE_ID
-#define DEVICE_ID 'A'
+#ifndef DEVICE_ID
+  #error "DEVICE_ID must be set in platformio.ini"
 #endif
 
 #ifdef HB_UART_NUM
-#define HB_UART_NUM 1
+    #define HB_UART_NUM 1
 #endif
 
 #ifdef HB_RX_PIN
-#define HB_RX_PIN 16
+    #define HB_RX_PIN 16
 #endif
 
 #ifdef HB_TX_PIN
-#define HB_TX_PIN 17
+    #define HB_TX_PIN 17
 #endif
 
 #ifdef HB_BAUD
-#define HB_BAUD 115200
+    #define HB_BAUD 115200
 #endif
 
 #ifdef HB_SEND_MS
