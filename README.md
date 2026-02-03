@@ -1,33 +1,92 @@
-# Reliable Remote Management of REPACSS Cluster
+# Reliable Remote Management of REPACSS Cluster (Telemetry v1)
 
-### Requirements: Heartbeat
-Purpose: The heartbeat mechanism is designed to ensure reliable operation and fault tolerance by continuously monitoring the health of the primary ESP32 and enabling seamless failover to a standby ESP32 when necessary.
+This project implements a **rack-level telemetry subsystem** using **two ESP32 controllers per rack**:
+- **Controller A (Primary)**: sends telemetry during normal operation
+- **Controller B (Standby)**: monitors A via heartbeat and **takes over telemetry sending** if A fails
 
-- The primary ESP32 shall transmit a heartbeat signal at a fixed interval not exceeding 500 ms.
+Telemetry is delivered to the Radxa cluster over **wired Ethernet (W5500)** as a **UDP JSON payload**.
 
-- The standby ESP32 shall continuously monitor the heartbeat signal to assess the operational status of the primary ESP32.
+---
 
-- A heartbeat timeout or more than 3 missed heartbeat shall be interpreted as a primary ESP32 failure.
+## Requirements: Heartbeat
 
-- Upon detecting a heartbeat failure, the standby ESP32 shall automatically assume responsibility for system communication without requiring manual intervention.
+### Purpose
+The heartbeat mechanism ensures fault tolerance by continuously monitoring the health of Controller A and enabling Controller B to take over telemetry transmission when A is no longer healthy.
 
-- A heartbeat failure event shall trigger a notification to the system administrator or maintenance team for awareness and diagnostics.
+### Requirements
+- Controller A shall transmit a heartbeat signal at a fixed interval of **500 ms**.
+- Controller B shall continuously monitor the heartbeat signal from Controller A.
+- A heartbeat failure shall be declared when **no heartbeat is received within 2000 ms**.
+- Upon detecting heartbeat failure, Controller B shall assume responsibility for telemetry transmission without manual intervention.
+- Heartbeat failure and failover state shall be reported as part of the telemetry payload.
 
-### Requirements: Relay Control
-Purpose: The relay control mechanism ensures safe and deterministic switching of communication or sensor lines between the primary and standby ESP32s, enabling controlled failover and preventing bus contention during normal operation and fault conditions.
+---
 
-- The relay shall default to connecting the system to the primary ESP32 during normal operation.
+## Requirements: Network Communication
 
-- Relay state changes shall be controlled exclusively by validated system logic (e.g., heartbeat status or explicit failover conditions).
+### Purpose
+This version of the project uses **Ethernet only** for deterministic, reliable telemetry transport.
 
-- Upon detection of a primary ESP32 failure, the relay shall switch control to the standby ESP32 within a bounded and predictable time window.
+### Requirements
+- The system shall use a **W5500 Ethernet module** for network communication.
+- Telemetry shall be transmitted to the Radxa cluster using **UDP**.
+- All ESP32 devices shall transmit to a **single Radxa IP address**.
+- Each telemetry message shall include a unique device identifier (**MAC address**).
 
-- The relay shall prevent simultaneous connection of both ESP32s to shared communication lines to avoid electrical conflicts.
+---
 
-- Relay switching shall occur only after the primary ESP32 is deemed inactive or unresponsive, as determined by the heartbeat mechanism.
+## Requirements: Telemetry Payload
 
-- Relay state transitions shall be logged or reported to the monitoring system for diagnostics and maintenance purposes.
-The relay control logic shall support recovery, allowing control to return to the primary ESP32 once it is verified to be operational and stable.
+### Purpose
+The telemetry payload provides a single structured message that Radxa can ingest and store.
+
+### Requirements
+Each telemetry message shall include:
+- `message_type` set to `"telemetry"`
+- `device.mac`
+- `timestamp_device_ms`
+- `items[]` containing heartbeat, sensors, and failover event data
+
+---
+
+## Failover Telemetry Rule (Critical)
+
+### Requirements
+- Controller A shall transmit telemetry while it is operational.
+- Controller B shall not transmit telemetry while Controller A is healthy.
+- Controller B shall begin transmitting telemetry only after Controller A failure.
+- Controller B shall stop transmitting when Controller A recovers.
+
+---
+
+## Data Structure
+
+```json
+{
+  "message_type": "telemetry",
+  "device": { "mac": "AA:BB:CC:DD:EE:FF" },
+  "timestamp_device_ms": 0,
+  "items": [
+    { "kind": "heartbeat", "controller_a_alive": true, "controller_b_alive": true },
+    {
+      "kind": "sensors",
+      "buses": [
+        { "bus": "cool", "temperatures_c": [0.0, 0.0, 0.0] },
+        { "bus": "exhaust", "temperatures_c": [0.0, 0.0, 0.0] }
+      ]
+    },
+    { "kind": "event", "type": "failover", "occurred": false, "details": "" }
+  ]
+}
+```
+
+---
+
+## Not in This Version
+- No relay control
+- No SPDT switch control
+- No sensor-bus switching
+
 
 ### Requirements: Sensor Bus Configuration
 Purpose: The sensor bus architecture provides redundant access to environmental sensors by implementing two independent buses (front and back) while ensuring electrical isolation and controlled selection using analog SPDT switches.
